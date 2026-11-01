@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
+<meta name="apple-mobile-web-app-title" content="Postfach">
 <title>Blackjack Quiz – TikTok-Postfach</title>
 <style>
   :root { --bg:#0b1120; --card:#131c31; --line:#24304a; --text:#e8edf5; --muted:#8d9ab3; --accent:#f28c28; }
@@ -12,56 +13,112 @@
   main { max-width:520px; margin:0 auto; padding:20px 16px 60px; }
   h1 { font-size:22px; margin:0 0 4px; }
   .sub { color:var(--muted); margin:0 0 20px; font-size:14px; }
+  .sub a { color:var(--muted); }
   article { background:var(--card); border-top:5px solid var(--accent); padding:14px; margin:0 0 22px; }
   article.done { border-top-color:var(--line); opacity:.6; }
   .meta { color:var(--muted); font-size:13px; margin-bottom:4px; }
   h2 { font-size:17px; margin:0 0 10px; }
-  video { display:block; height:min(52vh, 560px); width:auto; aspect-ratio:9/16; margin:0 auto; background:#000; }
+  video { display:block; height:min(40vh, 420px); width:auto; max-width:100%; aspect-ratio:9/16; margin:0 auto; background:#000; }
   textarea { width:100%; min-height:120px; margin:10px 0 8px; background:var(--bg); color:var(--text); border:1px solid var(--line); padding:8px; font-family:inherit; font-size:14px; line-height:1.4; resize:vertical; }
   .row { display:flex; gap:8px; flex-wrap:wrap; }
-  a.btn, button { flex:1 1 140px; text-align:center; padding:11px 12px; font-weight:700; font-size:15px; border:0; cursor:pointer; text-decoration:none; }
-  a.btn { background:var(--accent); color:#111; }
-  button { background:var(--line); color:var(--text); }
+  button { flex:1 1 140px; padding:12px; font:inherit; font-weight:700; font-size:15px; border:0; cursor:pointer; background:var(--line); color:var(--text); }
+  button.primary { background:var(--accent); color:#111; }
+  button:disabled { opacity:.7; }
+  a.file { display:inline-block; margin-top:8px; color:var(--muted); font-size:13px; }
   label { display:flex; align-items:center; gap:8px; margin-top:10px; color:var(--muted); font-size:14px; }
 </style>
 </head>
 <body>
 <main>
 <h1>TikTok-Postfach</h1>
-<p class="sub">Video speichern, in TikTok hochladen, Text einfügen. YouTube läuft automatisch.</p>
-<article data-date="2026-11-01">
-  <div class="meta">#1 · 2026-11-01</div>
-  <h2>8-8 vs 9: Split or not? | Blackjack Quiz #1</h2>
-  <video src="v/2026-11-01.mp4#t=1" controls playsinline preload="metadata"></video>
-  <textarea readonly>8-8 vs 9: what's your move? 🃏 Blackjack Quiz #1
-3 hands, 3 seconds each. How many did you get? 👇
-Math &amp; strategy education — not gambling advice. 18+
-
-#blackjack #basicstrategy #cardgames #math #quiz</textarea>
-  <div class="row">
-    <a class="btn" href="v/2026-11-01.mp4" download="blackjack-quiz-1.mp4">Video speichern</a>
-    <button type="button" data-copy>Text kopieren</button>
-  </div>
-  <label><input type="checkbox" data-done> Auf TikTok gepostet</label>
-</article>
-<p class="sub"><a href="privacy.html" style="color:var(--muted)">Privacy Policy / Datenschutz</a></p>
+<p class="sub">„Video teilen“ → <b>Video sichern</b> (landet in Fotos) oder direkt <b>TikTok</b> wählen. Dann „Text kopieren“ und beim Posten einfügen.</p>
+<div id="list"><p class="sub">Lädt …</p></div>
+<p class="sub"><a href="privacy.html">Privacy Policy / Datenschutz</a></p>
 </main>
 <script>
   const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
-  document.querySelectorAll('article').forEach((a) => {
-    const key = 'posted-' + a.dataset.date;
-    const box = a.querySelector('[data-done]');
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const list = document.getElementById('list');
+
+  // Loads the video into memory with a progress display (needed to hand it to the iPhone share menu).
+  async function loadFile(e, btn) {
+    const r = await fetch(e.file);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const total = Number(r.headers.get('content-length')) || 0;
+    let blob;
+    if (total && r.body && r.body.getReader) {
+      const reader = r.body.getReader(), parts = [];
+      let got = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        parts.push(value); got += value.length;
+        btn.textContent = 'Video lädt … ' + Math.round((got / total) * 100) + ' %';
+      }
+      blob = new Blob(parts, { type: 'video/mp4' });
+    } else {
+      btn.textContent = 'Video lädt …';
+      blob = await r.blob();
+    }
+    return new File([blob], 'blackjack-quiz-' + e.number + '.mp4', { type: 'video/mp4' });
+  }
+
+  function wire(article, e) {
+    const key = 'posted-' + e.date;
+    const box = article.querySelector('[data-done]');
     box.checked = store.get(key) === '1';
-    a.classList.toggle('done', box.checked);
-    box.addEventListener('change', () => { store.set(key, box.checked ? '1' : '0'); a.classList.toggle('done', box.checked); });
-    const btn = a.querySelector('[data-copy]');
-    btn.addEventListener('click', async () => {
-      const t = a.querySelector('textarea');
+    article.classList.toggle('done', box.checked);
+    box.addEventListener('change', () => { store.set(key, box.checked ? '1' : '0'); article.classList.toggle('done', box.checked); });
+
+    const copy = article.querySelector('[data-copy]');
+    copy.addEventListener('click', async () => {
+      const t = article.querySelector('textarea');
       try { await navigator.clipboard.writeText(t.value); } catch { t.select(); document.execCommand('copy'); }
-      btn.textContent = 'Kopiert ✓';
-      setTimeout(() => (btn.textContent = 'Text kopieren'), 1500);
+      copy.textContent = 'Kopiert ✓';
+      setTimeout(() => (copy.textContent = 'Text kopieren'), 1500);
     });
-  });
+
+    const share = article.querySelector('[data-share]');
+    let file = null;
+    const open = async () => {
+      try { await navigator.share({ files: [file] }); share.textContent = 'Video teilen'; }
+      catch (err) {
+        // iOS only allows the share menu right after a tap: one more tap after loading
+        if (err && err.name === 'NotAllowedError') share.textContent = 'Jetzt teilen';
+        else share.textContent = 'Video teilen';
+      }
+    };
+    share.addEventListener('click', async () => {
+      if (!navigator.canShare) { window.location.href = e.file; return; } // no share menu (computer): open the file
+      if (file) return open();
+      share.disabled = true;
+      try { file = await loadFile(e, share); }
+      catch { share.disabled = false; share.textContent = 'Laden fehlgeschlagen – nochmal tippen'; return; }
+      share.disabled = false;
+      if (!navigator.canShare({ files: [file] })) { share.textContent = 'Teilen geht hier nicht – Link unten'; return; }
+      open();
+    });
+  }
+
+  fetch('manifest.json?ts=' + Date.now(), { cache: 'no-store' })
+    .then((r) => (r.ok ? r.json() : []))
+    .catch(() => [])
+    .then((items) => {
+      if (!items.length) { list.innerHTML = '<p class="sub">Noch keine Videos. Die erste Folge erscheint nach dem ersten Lauf.</p>'; return; }
+      list.innerHTML = items.map((e) => `<article>
+        <div class="meta">#${e.number} · ${esc(e.date)}</div>
+        <h2>${esc(e.title)}</h2>
+        <video src="${esc(e.file)}#t=1" controls playsinline preload="metadata"></video>
+        <textarea readonly>${esc(e.caption)}</textarea>
+        <div class="row">
+          <button type="button" class="primary" data-share>Video teilen</button>
+          <button type="button" data-copy>Text kopieren</button>
+        </div>
+        <a class="file" href="${esc(e.file)}" download="blackjack-quiz-${e.number}.mp4">oder als Datei laden</a>
+        <label><input type="checkbox" data-done> Auf TikTok gepostet</label>
+      </article>`).join('');
+      list.querySelectorAll('article').forEach((a, i) => wire(a, items[i]));
+    });
 </script>
 </body>
 </html>
